@@ -2,44 +2,43 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-<<<<<<< HEAD
-import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from "firebase/firestore";
-=======
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
-import { auth, db } from "@/lib/firebase";
-import { uploadImageToCloudinary } from "@/lib/cloudinary";
-import { LaporanBencana } from "@/types/disaster";
-import BottomNavRelawan from "@/components/BottomNavRelawan";
-import {
-  Map, Navigation, CheckCircle2, Loader2, X, LogOut, Clock,
-<<<<<<< HEAD
-  ShieldAlert, User, Image as ImageIcon, Check, Info, Users
-=======
-  ShieldAlert, User, Image as ImageIcon, Check, Info
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
-} from "lucide-react";
+import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore";
+import { auth, db } from "../../lib/firebase";
+import { uploadImageToCloudinary } from "../../lib/cloudinary";
+import { LaporanBencana } from "../../types/disaster";
+import BottomNavRelawan from "../../components/BottomNavRelawan";
+import Link from "next/link";
+import { Map, Navigation, CheckCircle2, Loader2, X, LogOut, Clock, ShieldAlert, User, Image as ImageIcon, Check, Info, Users, Home } from "lucide-react";
 
 export default function RelawanPage() {
   const router = useRouter();
   const [laporan, setLaporan] = useState<LaporanBencana[]>([]);
   const [userUid, setUserUid] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"menunggu" | "tugas_saya">("menunggu");
+  const [userName, setUserName] = useState<string>("Relawan Lapangan");
+  const [activeTab, setActiveTab] = useState<"menunggu" | "tugas_saya" | "riwayat">("menunggu");
 
-  // State Modals
-  const [selectedTask, setSelectedTask] = useState<LaporanBencana | null>(null); // Untuk Modal Selesai
-  const [detailTask, setDetailTask] = useState<LaporanBencana | null>(null);     // Untuk Modal Detail Informasi
-
+  const [selectedTask, setSelectedTask] = useState<LaporanBencana | null>(null);
+  const [detailTask, setDetailTask] = useState<LaporanBencana | null>(null);
   const [fotoSelesai, setFotoSelesai] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [catatan, setCatatan] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [riwayat, setRiwayat] = useState<LaporanBencana[]>([]);
+  const [namaRelawanMap, setNamaRelawanMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user || user.isAnonymous) router.replace("/login");
-      else setUserUid(user.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user || user.isAnonymous) {
+        router.replace("/login");
+      } else {
+        setUserUid(user.uid);
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) setUserName(userDoc.data().name || userDoc.data().nama || "Relawan Lapangan");
+        } catch (e) {
+          console.error(e);
+        }
+      }
     });
     return () => unsubscribe();
   }, [router]);
@@ -48,49 +47,68 @@ export default function RelawanPage() {
     if (!userUid) return;
     const q = query(collection(db, "laporan"), where("status", "in", ["Menunggu", "Diproses"]));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LaporanBencana));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as LaporanBencana));
       data.sort((a, b) => new Date(b.waktu_kejadian).getTime() - new Date(a.waktu_kejadian).getTime());
       setLaporan(data);
     });
     return () => unsubscribe();
   }, [userUid]);
 
-<<<<<<< HEAD
-  // ─── FITUR BARU: Ambil Alih dengan ArrayUnion & Kuota ───
-  const handleAmbilAlih = async (item: LaporanBencana, e: React.MouseEvent) => {
-    e.stopPropagation(); // Mencegah klik menembus ke card pembungkus
-    if (!userUid || !item.id) return;
+  // ── Ambil Riwayat (Misi Selesai) yang melibatkan relawan ini ──
+  useEffect(() => {
+    if (!userUid) return;
+    const q = query(collection(db, "laporan"), where("status", "==", "Selesai"), where("relawan_terlibat", "array-contains", userUid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as LaporanBencana));
+      data.sort((a, b) => new Date(b.waktu_kejadian).getTime() - new Date(a.waktu_kejadian).getTime());
+      setRiwayat(data);
+    });
+    return () => unsubscribe();
+  }, [userUid]);
 
+  useEffect(() => {
+    if (!detailTask || !detailTask.relawan_terlibat || detailTask.relawan_terlibat.length === 0) return;
+    const ambilNamaRelawan = async () => {
+      const petaNamaBaru = { ...namaRelawanMap };
+      let adaPerubahan = false;
+      for (const uid of detailTask.relawan_terlibat!) {
+        if (!petaNamaBaru[uid]) {
+          try {
+            const userDoc = await getDoc(doc(db, "users", uid));
+            if (userDoc.exists()) petaNamaBaru[uid] = userDoc.data().name || userDoc.data().nama || "Relawan";
+            else petaNamaBaru[uid] = `Relawan (${uid.slice(0, 6)})`;
+            adaPerubahan = true;
+          } catch (err) {
+            petaNamaBaru[uid] = `Relawan (${uid.slice(0, 6)})`;
+            adaPerubahan = true;
+          }
+        }
+      }
+      if (adaPerubahan) setNamaRelawanMap(petaNamaBaru);
+    };
+    ambilNamaRelawan();
+  }, [detailTask]);
+
+  const handleAmbilAlih = async (item: LaporanBencana, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!userUid || !item.id) return;
     const batas = item.kebutuhan_relawan || 5;
     const saatIni = item.relawan_terlibat?.length || 0;
-
-    // Cek kuota, cegah ambil alih jika sudah penuh dan relawan belum bergabung
     if (saatIni >= batas && !(item.relawan_terlibat || []).includes(userUid)) {
       return alert("Kapasitas relawan untuk tugas ini sudah penuh!");
     }
-
     try {
-      await updateDoc(doc(db, "laporan", item.id), { 
-        status: "Diproses", 
-        relawan_terlibat: arrayUnion(userUid) 
+      await updateDoc(doc(db, "laporan", item.id), {
+        status: "Diproses",
+        relawan_terlibat: arrayUnion(userUid),
+        relawan_data: arrayUnion({ uid: userUid, nama: userName }), 
       });
-=======
-  const handleAmbilAlih = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Mencegah klik menembus ke card pembungkus
-    if (!userUid) return;
-    try {
-      await updateDoc(doc(db, "laporan", id), { status: "Diproses", relawan_id: userUid });
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
       setActiveTab("tugas_saya");
-    } catch (error) {
+    } catch (err) {
       alert("Gagal mengambil alih tugas.");
     }
   };
 
-<<<<<<< HEAD
-=======
-  // ─── FIX: URL Google Maps Direction ───
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
   const bukaNavigasi = (lat: number, lng: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank");
@@ -109,36 +127,26 @@ export default function RelawanPage() {
   const handleSelesaikanTugas = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask || !selectedTask.id || !fotoSelesai) return;
-
     setIsSubmitting(true);
     try {
       const foto_after_url = await uploadImageToCloudinary(fotoSelesai);
       await updateDoc(doc(db, "laporan", selectedTask.id), {
-        status: "Selesai", catatan_relawan: catatan, foto_after_url, waktu_selesai: new Date().toISOString()
+        status: "Selesai",
+        catatan_relawan: catatan,
+        foto_after_url,
+        waktu_selesai: new Date().toISOString(),
       });
       setSelectedTask(null); setFotoSelesai(null); setFotoPreview(null); setCatatan("");
-    } catch (error) {
+    } catch (err) {
       alert("Gagal menyelesaikan tugas.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-<<<<<<< HEAD
-  // Filter pintar: Radar masuk menampilkan yang menunggu atau diproses TAPI relawan ini belum gabung
-  const laporanMenunggu = laporan.filter(l => 
-    l.status === "Menunggu" || 
-    (l.status === "Diproses" && !(l.relawan_terlibat || []).includes(userUid || ""))
-  );
-  
-  // Filter tugas saya: Hanya yang UID relawan ada di dalam array relawan_terlibat
-  const tugasSaya = laporan.filter(l => 
-    (l.relawan_terlibat || []).includes(userUid || "")
-  );
-=======
-  const laporanMenunggu = laporan.filter(l => l.status === "Menunggu");
-  const tugasSaya = laporan.filter(l => l.status === "Diproses" && l.relawan_id === userUid);
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
+  const laporanMenunggu = laporan.filter(l => l.status === "Menunggu" || (l.status === "Diproses" && !(l.relawan_terlibat || []).includes(userUid || "")));
+  const tugasSaya = laporan.filter(l => (l.relawan_terlibat || []).includes(userUid || ""));
+  const currentList = activeTab === "menunggu" ? laporanMenunggu : (activeTab === "tugas_saya" ? tugasSaya : riwayat);
 
   if (!userUid) return <div className="min-h-screen bg-slate-50 flex justify-center items-center"><Loader2 className="animate-spin text-blue-600" /></div>;
 
@@ -149,6 +157,8 @@ export default function RelawanPage() {
       </div>
 
       <div className="max-w-md mx-auto relative z-10 px-4 py-6">
+        
+        {/* ── HEADER RELAWAN DENGAN TOMBOL PORTAL WARGA ── */}
         <header className="flex justify-between items-center mb-6 bg-white/70 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-200">
@@ -159,9 +169,17 @@ export default function RelawanPage() {
               <p className="text-[11px] text-slate-500 font-medium">Unit Reaksi Cepat</p>
             </div>
           </div>
-          <button onClick={() => signOut(auth)} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
+          
+          <div className="flex items-center gap-2">
+            {/* Tombol ke Portal Warga (Publik) */}
+            <Link href="/" title="Ke Portal Warga" className="p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors">
+              <Home className="w-4 h-4" />
+            </Link>
+            {/* Tombol Logout */}
+            <button onClick={() => signOut(auth)} title="Keluar Sesi" className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </header>
 
         <div className="flex bg-slate-200/50 p-1 rounded-xl mb-5">
@@ -171,27 +189,54 @@ export default function RelawanPage() {
           <button onClick={() => setActiveTab("tugas_saya")} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${activeTab === "tugas_saya" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"}`}>
             <User className="w-4 h-4" /> Tugas Saya {tugasSaya.length > 0 && <span className="bg-indigo-500 text-white px-1.5 py-0.5 rounded-full text-[9px]">{tugasSaya.length}</span>}
           </button>
+          <button onClick={() => setActiveTab("riwayat")} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${activeTab === "riwayat" ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500"}`}>
+            <CheckCircle2 className="w-4 h-4" /> Riwayat {riwayat.length > 0 && <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded-full text-[9px]">{riwayat.length}</span>}
+          </button>
         </div>
 
         <div className="space-y-4">
-          {(activeTab === "menunggu" ? laporanMenunggu : tugasSaya).length === 0 ? (
+          {currentList.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3"><CheckCircle2 className="w-8 h-8 text-slate-300" /></div>
               <h3 className="text-sm font-bold text-slate-700">Area Aman</h3>
               <p className="text-xs text-slate-400 mt-1">Belum ada tugas.</p>
             </div>
           ) : (
-<<<<<<< HEAD
-            (activeTab === "menunggu" ? laporanMenunggu : tugasSaya).map((item) => {
-              // Kalkulasi Kuota Relawan
+            currentList.map((item) => {
               const batas = item.kebutuhan_relawan || 5;
               const saatIni = item.relawan_terlibat?.length || 0;
               const persentase = (saatIni / batas) * 100;
-
+              // If viewing riwayat, show foto_after_url and catatan_relawan
+              if (activeTab === "riwayat") {
+                return (
+                  <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col transition-all hover:border-emerald-300">
+                    <div onClick={() => setDetailTask(item)} className="p-4 flex gap-4 items-start cursor-pointer group active:bg-slate-50">
+                      <div className="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-slate-100 relative shadow-sm border border-slate-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.foto_after_url || item.foto_url} alt="Bukti" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <h3 className="text-sm font-bold text-slate-800 leading-tight">{item.jenis_bencana}</h3>
+                          <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(item.waktu_selesai || item.waktu_kejadian).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.catatan_relawan || "Tidak ada catatan."}</p>
+                        <div className="mt-3">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1"><Users className="w-3 h-3" /> Tim Penangan</span>
+                            <span className="text-[10px] font-bold text-indigo-600">{saatIni} / {batas}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col transition-all hover:border-indigo-300">
-                  
-                  {/* Area Konten Utama (Bisa Diklik untuk Detail) */}
                   <div onClick={() => setDetailTask(item)} className="p-4 flex gap-4 items-start cursor-pointer group active:bg-slate-50">
                     <div className="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-slate-100 relative shadow-sm border border-slate-200">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -206,39 +251,23 @@ export default function RelawanPage() {
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.deskripsi}</p>
-                      
-                      {/* ── Progress Bar Kuota Relawan ── */}
                       <div className="mt-3">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                            <Users className="w-3 h-3" /> Kuota Pasukan
-                          </span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1"><Users className="w-3 h-3" /> Kuota Pasukan</span>
                           <span className="text-[10px] font-bold text-indigo-600">{saatIni} / {batas}</span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-500 ${persentase >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${persentase}%` }}></div>
+                          <div className={`h-full rounded-full transition-all duration-500 ${persentase >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${persentase}%` }} />
                         </div>
                       </div>
-
                     </div>
                   </div>
-
-                  {/* Baris Tombol Aksi */}
                   <div className="bg-slate-50 border-t border-slate-100 p-3 flex gap-2">
                     <button onClick={(e) => bukaNavigasi(item.koordinat.lat, item.koordinat.lng, e)} className="flex-1 py-2.5 bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-sm">
                       <Navigation className="w-4 h-4 text-blue-600" /> Peta
                     </button>
-                    
                     {activeTab === "menunggu" ? (
-                      <button 
-                        onClick={(e) => handleAmbilAlih(item, e)} 
-                        disabled={saatIni >= batas}
-                        className={`flex-[1.5] py-2.5 text-white text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md ${
-                          saatIni >= batas 
-                            ? "bg-slate-300 text-slate-500 shadow-none cursor-not-allowed" 
-                            : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
-                        }`}
-                      >
+                      <button onClick={(e) => handleAmbilAlih(item, e)} disabled={saatIni >= batas} className={`flex-[1.5] py-2.5 text-white text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md ${saatIni >= batas ? "bg-slate-300 text-slate-500 shadow-none cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"}`}>
                         <Check className="w-4 h-4" /> {saatIni >= batas ? "Tim Penuh" : "Gabung Misi"}
                       </button>
                     ) : (
@@ -250,55 +279,10 @@ export default function RelawanPage() {
                 </div>
               );
             })
-=======
-            (activeTab === "menunggu" ? laporanMenunggu : tugasSaya).map((item) => (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col transition-all hover:border-indigo-300">
-
-                {/* Area Konten Utama (Bisa Diklik untuk Detail) */}
-                <div onClick={() => setDetailTask(item)} className="p-4 flex gap-4 items-start cursor-pointer group active:bg-slate-50">
-                  <div className="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-slate-100 relative shadow-sm border border-slate-200">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.foto_url} alt="Bencana" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-sm font-bold text-slate-800 leading-tight">{item.jenis_bencana}</h3>
-                      <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {new Date(item.waktu_kejadian).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.deskripsi}</p>
-                    <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-indigo-500">
-                      Lihat Info Lengkap &rarr;
-                    </div>
-                  </div>
-                </div>
-
-                {/* Baris Tombol Aksi */}
-                <div className="bg-slate-50 border-t border-slate-100 p-3 flex gap-2">
-                  <button onClick={(e) => bukaNavigasi(item.koordinat.lat, item.koordinat.lng, e)} className="flex-1 py-2.5 bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-sm">
-                    <Navigation className="w-4 h-4 text-blue-600" /> Google Maps
-                  </button>
-
-                  {activeTab === "menunggu" ? (
-                    <button onClick={(e) => handleAmbilAlih(item.id as string, e)} className="flex-[1.5] py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md shadow-blue-200">
-                      <Check className="w-4 h-4" /> Ambil Alih
-                    </button>
-                  ) : (
-                    <button onClick={() => setSelectedTask(item)} className="flex-[1.5] py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md shadow-emerald-200">
-                      <CheckCircle2 className="w-4 h-4" /> Selesaikan Misi
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
           )}
         </div>
       </div>
 
-      {/* ── MODAL 1: INFORMASI DETAIL MISI ── */}
       {detailTask && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 duration-300 flex flex-col max-h-[90vh] overflow-hidden">
@@ -309,17 +293,9 @@ export default function RelawanPage() {
               </div>
               <button onClick={() => setDetailTask(null)} className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-500"><X className="w-4 h-4" /></button>
             </div>
-<<<<<<< HEAD
-            
-=======
-
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
             <div className="overflow-y-auto pb-6">
-              {/* Foto Skala Penuh */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={detailTask.foto_url} alt="Bencana" className="w-full h-48 object-cover bg-slate-100" />
-<<<<<<< HEAD
-              
               <div className="p-5 space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
@@ -327,43 +303,51 @@ export default function RelawanPage() {
                     <p className="text-xl font-black text-slate-800">{detailTask.jenis_bencana}</p>
                   </div>
                   <div className="text-right">
-=======
-
-              <div className="p-5 space-y-4">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kategori Bencana</p>
-                  <p className="text-xl font-black text-slate-800">{detailTask.jenis_bencana}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kondisi Lapangan</p>
-                  <p className="text-sm font-medium text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">{detailTask.deskripsi}</p>
-                </div>
-                <div className="flex gap-4">
-                  <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Waktu Kejadian</p>
                     <p className="text-sm font-bold text-slate-700">{new Date(detailTask.waktu_kejadian).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-                  </div>
-                  <div>
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 mt-1">Status</p>
                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${detailTask.status === 'Menunggu' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>{detailTask.status}</span>
                   </div>
                 </div>
 
-<<<<<<< HEAD
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Identitas Pelapor</p>
                   <p className="text-sm font-bold text-slate-800">{detailTask.nama_pelapor || "Warga Anonim"}</p>
                   <p className="text-xs font-mono text-slate-500">{detailTask.telepon_pelapor || "-"}</p>
                 </div>
 
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Tim Relawan Bertugas
+                    </p>
+                    <span className="bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                      {(detailTask.relawan_terlibat || []).length} / {detailTask.kebutuhan_relawan || 5}
+                    </span>
+                  </div>
+                  {(detailTask.relawan_terlibat && detailTask.relawan_terlibat.length > 0) ? (
+                    <ul className="space-y-1.5 mt-2">
+                      {detailTask.relawan_terlibat.map((uid: string, idx: number) => (
+                        <li key={uid} className="text-xs font-medium text-indigo-900 flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-indigo-200 flex items-center justify-center text-[10px] font-bold text-indigo-700 shrink-0">
+                            {idx + 1}
+                          </div>
+                          <span className="font-semibold truncate">
+                            {uid === userUid ? "👤 Anda (Saya)" : (namaRelawanMap[uid] || "Memuat nama...")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-indigo-400 italic mt-1">Belum ada relawan yang mengambil misi ini.</p>
+                  )}
+                </div>
+
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kondisi Lapangan</p>
                   <p className="text-sm font-medium text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">{detailTask.deskripsi}</p>
                 </div>
-                
-=======
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
+
                 <button onClick={() => bukaNavigasi(detailTask.koordinat.lat, detailTask.koordinat.lng)} className="w-full mt-4 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200">
                   <Navigation className="w-5 h-5" /> Mulai Navigasi Rute Sekarang
                 </button>
@@ -373,16 +357,8 @@ export default function RelawanPage() {
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* ── MODAL 2: PENYELESAIAN TUGAS ── */}
       {selectedTask && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
-=======
-      {/* ── MODAL 2: PENYELESAIAN TUGAS (Sama seperti sebelumnya) ── */}
-      {selectedTask && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
-          {/* ... (Isi modal selesaikan tugas tidak berubah) ... */}
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
           <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center sticky top-0 z-10">
               <div><h3 className="font-bold text-slate-800">Validasi Selesai</h3><p className="text-[10px] text-slate-500">ID: {selectedTask.id}</p></div>

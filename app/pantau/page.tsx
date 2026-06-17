@@ -1,29 +1,86 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, query, orderBy, limit, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { LaporanBencana } from "@/types/disaster";
 import BottomNav from "@/components/BottomNav";
-import { Search, Activity, CheckCircle2, AlertTriangle, Clock, Info, X, Loader2, ChevronRight } from "lucide-react";
+
+type RelawanData = { uid: string; nama: string };
+import { Search, Activity, CheckCircle2, AlertTriangle, Clock, Info, X, Loader2, ChevronRight, Users } from "lucide-react";
 
 export default function PantauPage() {
   const [laporanTerbaru, setLaporanTerbaru] = useState<LaporanBencana[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<LaporanBencana | null>(null);
+  const [searchResult, setSearchResult] = useState<LaporanBencana & { relawan_data?: RelawanData[] } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // ─── AMBIL FEED AKTIVITAS TERBARU ───
+  // ── FITUR BARU: Kamus Memori Nama Relawan ──
+  const [namaRelawanMap, setNamaRelawanMap] = useState<Record<string, string>>({});
+  const fetchedUids = useRef<Set<string>>(new Set());
+
+  // ─── AMBIL FEED AKTIVITAS TERBARU (DENGAN SORTING PINTAR) ───
   useEffect(() => {
-    const q = query(collection(db, "laporan"), orderBy("waktu_kejadian", "desc"), limit(10));
+    // Kita naikkan limit jadi 30 agar ada cukup data untuk disortir
+    const q = query(collection(db, "laporan"), orderBy("waktu_kejadian", "desc"), limit(30));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LaporanBencana));
+      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LaporanBencana));
+
+      // ── LOGIKA SORTING PINTAR: YANG BELUM SELESAI NAIK KE ATAS ──
+      data.sort((a, b) => {
+        const aSelesai = a.status === 'Selesai';
+        const bSelesai = b.status === 'Selesai';
+
+        // Jika A sudah selesai tapi B belum, A dilempar ke bawah
+        if (aSelesai && !bSelesai) return 1;
+        // Jika B sudah selesai tapi A belum, A ditarik ke atas
+        if (!aSelesai && bSelesai) return -1;
+
+        // Jika status mereka berdua sama (sama-sama selesai atau sama-sama belum),
+        // urutkan berdasarkan waktu paling baru
+        return new Date(b.waktu_kejadian).getTime() - new Date(a.waktu_kejadian).getTime();
+      });
+
       setLaporanTerbaru(data);
       setIsLoading(false);
     });
+    
     return () => unsubscribe();
   }, []);
+
+  // ── FITUR BARU: Ambil Nama Relawan Secara Real-time Saat Modal Dibuka ──
+  useEffect(() => {
+    if (!searchResult || !searchResult.relawan_terlibat || searchResult.relawan_terlibat.length === 0) return;
+
+    const ambilNamaRelawan = async () => {
+      // Saring UID yang belum pernah dicari sebelumnya
+      const missingUids = searchResult.relawan_terlibat!.filter(uid => !fetchedUids.current.has(uid));
+      if (missingUids.length === 0) return;
+
+      const newNames: Record<string, string> = {};
+      
+      for (const uid of missingUids) {
+        fetchedUids.current.add(uid); // Tandai sedang/sudah dicari
+        try {
+          const userDoc = await getDoc(doc(db, "users", uid));
+          if (userDoc.exists()) {
+            newNames[uid] = userDoc.data().name || userDoc.data().nama || "Relawan Lapangan";
+          } else {
+            newNames[uid] = `Relawan (${uid.slice(0, 6)})`;
+          }
+        } catch (error) {
+          // Fallback jika tidak ada akses baca ke koleksi users untuk publik
+          newNames[uid] = `Relawan (${uid.slice(0, 6)})`;
+        }
+      }
+
+      setNamaRelawanMap(prev => ({ ...prev, ...newNames }));
+    };
+
+    ambilNamaRelawan();
+  }, [searchResult]);
 
   // ─── FUNGSI PENCARIAN TIKET ───
   const handleSearch = async (e: React.FormEvent) => {
@@ -53,14 +110,14 @@ export default function PantauPage() {
   return (
     <main className="min-h-screen bg-slate-50 relative overflow-x-hidden font-sans pb-32 flex justify-center">
       
-      {/* Ambient Background - Konsisten dengan tema Warga */}
+      {/* Ambient Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-20 -left-20 w-72 h-72 bg-blue-100 rounded-full blur-[70px] opacity-60" />
       </div>
       
       <div className="w-full max-w-md mx-auto relative z-10 px-4 pt-8 py-6">
         
-        {/* ── HEADER (Rata Kiri, Sesuai Design System) ── */}
+        {/* ── HEADER ── */}
         <header className="mb-8 flex items-center gap-4">
           <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center shrink-0">
             <Activity className="w-6 h-6 text-blue-600" />
@@ -84,7 +141,6 @@ export default function PantauPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Masukkan ID Resi..." 
-                // PERBAIKAN: Menambahkan text-slate-900 dan placeholder:text-slate-400
                 className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white transition-all font-mono" 
                 required
               />
@@ -123,31 +179,27 @@ export default function PantauPage() {
             </div>
           ) : (
             laporanTerbaru.map((item) => {
-              // PERBAIKAN: Menangani status "Ditangani" dan "Diproses" ke warna kuning/amber
               const isSelesai = item.status === 'Selesai';
-              const isProses = item.status === 'Diproses';
-              const isMenunggu = !isSelesai && !isProses;
+              // Pengecekan aman untuk Ditangani atau Diproses
+              const isProses = item.status === 'Diproses' || (item.status as string) === 'Ditangani';
 
               return (
                 <div 
                   key={item.id} 
                   onClick={() => setSearchResult(item)} 
-                  className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex gap-4 items-start hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
+                  className={`p-4 rounded-3xl shadow-sm border flex gap-4 items-start transition-all cursor-pointer group ${
+                    isSelesai 
+                      ? 'bg-slate-50/50 border-slate-100 opacity-75 hover:opacity-100' // Visual sedikit pudar untuk yang selesai
+                      : 'bg-white border-blue-100 hover:border-blue-300 hover:shadow-md'
+                  }`}
                 >
-                  {/* Thumbnail Foto */}
                   <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-50">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.foto_url} alt={item.jenis_bencana} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    
-                    {/* Badge Status Kecil */}
                     <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${
-                      isSelesai ? 'bg-emerald-500 text-white' :
-                      isProses ? 'bg-amber-500 text-white' :
-                      'bg-red-500 text-white'
+                      isSelesai ? 'bg-emerald-500 text-white' : isProses ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'
                     }`}>
-                      {isSelesai ? <CheckCircle2 className="w-3 h-3" /> : 
-                       isProses ? <Clock className="w-3 h-3" /> : 
-                       <AlertTriangle className="w-3 h-3" />}
+                      {isSelesai ? <CheckCircle2 className="w-3 h-3" /> : isProses ? <Clock className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                     </div>
                   </div>
                   
@@ -162,11 +214,7 @@ export default function PantauPage() {
                         {item.status}
                       </span>
                     </div>
-                    
-                    <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">
-                      {item.deskripsi}
-                    </p>
-                    
+                    <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">{item.deskripsi}</p>
                     <div className="flex items-center justify-between mt-3">
                       <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
                         <Clock className="w-3 h-3" /> {new Date(item.waktu_kejadian).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}
@@ -208,14 +256,13 @@ export default function PantauPage() {
                     <p className="text-xl font-black text-slate-800 mt-1">{searchResult.jenis_bencana}</p>
                   </div>
                   
-                  {/* Styling Status Modal Dinamis */}
                   <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border ${
                     searchResult.status === 'Selesai' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                    searchResult.status === 'Diproses' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                    (searchResult.status === 'Diproses' || (searchResult.status as string) === 'Ditangani') ? 'bg-amber-50 text-amber-600 border-amber-100' :
                     'bg-red-50 text-red-600 border-red-100'
                   }`}>
                     {searchResult.status === 'Selesai' ? <CheckCircle2 className="w-4 h-4" /> : 
-                     searchResult.status === 'Diproses' ? <Clock className="w-4 h-4" /> : 
+                     (searchResult.status === 'Diproses' || (searchResult.status as string) === 'Ditangani') ? <Clock className="w-4 h-4" /> : 
                      <AlertTriangle className="w-4 h-4" />}
                     {searchResult.status}
                   </span>
@@ -229,7 +276,7 @@ export default function PantauPage() {
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waktu Lapor</p>
-                      <p className="text-xs font-bold text-slate-800 mt-1">{new Date(searchResult.waktu_kejadian).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</p>
+                      <p className="text-xs font-bold text-slate-800 mt-1">{`${new Date(searchResult.waktu_kejadian).toLocaleDateString('id-ID', { weekday: 'long' })}, ${new Date(searchResult.waktu_kejadian).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}`}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID Tiket (Resi)</p>
@@ -237,6 +284,40 @@ export default function PantauPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* ── FITUR BARU: TIM RELAWAN YANG MENANGANI ── */}
+                {((searchResult.relawan_data && searchResult.relawan_data.length > 0) || (searchResult.relawan_terlibat && searchResult.relawan_terlibat.length > 0)) && (
+                  <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" /> Tim Relawan Bertugas
+                      </p>
+                      <span className="bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                        {(searchResult.relawan_data?.length || searchResult.relawan_terlibat?.length || 0)} / {searchResult.kebutuhan_relawan || 5}
+                      </span>
+                    </div>
+                    <ul className="space-y-1.5 mt-2">
+                      {searchResult.relawan_data ? (
+                        searchResult.relawan_data.map((relawan, idx) => (
+                          <li key={relawan.uid} className="text-xs font-medium text-indigo-900 flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-indigo-200 flex items-center justify-center text-[10px] font-bold text-indigo-700 shrink-0">{idx + 1}</div>
+                            <span className="font-semibold truncate">{relawan.nama}</span>
+                          </li>
+                        ))
+                      ) : (
+                        // Fallback untuk laporan lama
+                        searchResult.relawan_terlibat?.map((uid, idx) => (
+                          <li key={uid} className="text-xs font-medium text-indigo-900 flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-indigo-200 flex items-center justify-center text-[10px] font-bold text-indigo-700 shrink-0">{idx + 1}</div>
+                            <span className="font-semibold truncate">
+                              {namaRelawanMap[uid] || "Memuat nama..."}
+                            </span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                )}
 
                 {searchResult.status === 'Selesai' && searchResult.foto_after_url && (
                   <div className="border-t border-dashed border-slate-200 pt-5">

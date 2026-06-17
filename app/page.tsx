@@ -115,10 +115,6 @@ export default function WargaPage() {
 
       if (!formRef.current) throw new Error("Form tidak ditemukan");
       const formData = new FormData(formRef.current);
-<<<<<<< HEAD
-      
-=======
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
       const payload: LaporanBencana = {
         waktu_kejadian: new Date().toISOString(),
         jenis_bencana: formData.get("jenis") as JenisBencana,
@@ -127,15 +123,11 @@ export default function WargaPage() {
         foto_url,
         status: "Menunggu",
         pelapor_id: uid,
-<<<<<<< HEAD
-        
         // ── FITUR BARU: Data Pelapor & Default Kuantitas Relawan ──
-        nama_pelapor: formData.get("nama_pelapor") as string || "Warga Anonim",
-        telepon_pelapor: formData.get("telepon_pelapor") as string || "-",
+        nama_pelapor: (formData.get("nama_pelapor") as string) || "Warga Anonim",
+        telepon_pelapor: (formData.get("telepon_pelapor") as string) || "-",
         kebutuhan_relawan: 5, // Asumsi default: butuh 5 relawan per kejadian
         relawan_terlibat: [], // Array kosong saat laporan pertama kali dibuat
-=======
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
       };
 
       const docRef = await addDoc(collection(db, "laporan"), payload);
@@ -321,7 +313,6 @@ export default function WargaPage() {
               />
             </div>
 
-<<<<<<< HEAD
             {/* ── FITUR BARU: Kontak Darurat (Nama & Telepon Pelapor) ── */}
             <div className="space-y-3 bg-blue-50/40 border border-blue-100 p-4 rounded-xl">
               <label className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">
@@ -340,9 +331,6 @@ export default function WargaPage() {
                 className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-slate-700 placeholder:text-slate-400 transition-all"
               />
             </div>
-
-=======
->>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
             {/* Lokasi & Foto */}
             <div className="grid grid-cols-2 gap-3">
               {/* Tombol Lokasi GPS */}
@@ -377,7 +365,7 @@ export default function WargaPage() {
               {fotoPreview ? (
                 <div className="relative rounded-xl overflow-hidden border-2 border-dashed border-slate-200 min-h-[110px]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fotoPreview} alt="Pratinjau foto" className="w-full h-full object-cover absolute inset-0" />
+                  <img src={fotoPreview || ""} alt="Pratinjau foto" className="w-full h-full object-cover absolute inset-0" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   <button
                     type="button"
