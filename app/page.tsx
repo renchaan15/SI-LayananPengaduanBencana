@@ -115,7 +115,10 @@ export default function WargaPage() {
 
       if (!formRef.current) throw new Error("Form tidak ditemukan");
       const formData = new FormData(formRef.current);
+<<<<<<< HEAD
       
+=======
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
       const payload: LaporanBencana = {
         waktu_kejadian: new Date().toISOString(),
         jenis_bencana: formData.get("jenis") as JenisBencana,
@@ -124,12 +127,15 @@ export default function WargaPage() {
         foto_url,
         status: "Menunggu",
         pelapor_id: uid,
+<<<<<<< HEAD
         
         // ── FITUR BARU: Data Pelapor & Default Kuantitas Relawan ──
         nama_pelapor: formData.get("nama_pelapor") as string || "Warga Anonim",
         telepon_pelapor: formData.get("telepon_pelapor") as string || "-",
         kebutuhan_relawan: 5, // Asumsi default: butuh 5 relawan per kejadian
         relawan_terlibat: [], // Array kosong saat laporan pertama kali dibuat
+=======
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
       };
 
       const docRef = await addDoc(collection(db, "laporan"), payload);
@@ -315,6 +321,7 @@ export default function WargaPage() {
               />
             </div>
 
+<<<<<<< HEAD
             {/* ── FITUR BARU: Kontak Darurat (Nama & Telepon Pelapor) ── */}
             <div className="space-y-3 bg-blue-50/40 border border-blue-100 p-4 rounded-xl">
               <label className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">
@@ -334,6 +341,8 @@ export default function WargaPage() {
               />
             </div>
 
+=======
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
             {/* Lokasi & Foto */}
             <div className="grid grid-cols-2 gap-3">
               {/* Tombol Lokasi GPS */}

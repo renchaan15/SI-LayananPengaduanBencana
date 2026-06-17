@@ -2,14 +2,22 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+<<<<<<< HEAD
 import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from "firebase/firestore";
+=======
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
 import { auth, db } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { LaporanBencana } from "@/types/disaster";
 import BottomNavRelawan from "@/components/BottomNavRelawan";
 import {
   Map, Navigation, CheckCircle2, Loader2, X, LogOut, Clock,
+<<<<<<< HEAD
   ShieldAlert, User, Image as ImageIcon, Check, Info, Users
+=======
+  ShieldAlert, User, Image as ImageIcon, Check, Info
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
 } from "lucide-react";
 
 export default function RelawanPage() {
@@ -47,6 +55,7 @@ export default function RelawanPage() {
     return () => unsubscribe();
   }, [userUid]);
 
+<<<<<<< HEAD
   // ─── FITUR BARU: Ambil Alih dengan ArrayUnion & Kuota ───
   const handleAmbilAlih = async (item: LaporanBencana, e: React.MouseEvent) => {
     e.stopPropagation(); // Mencegah klik menembus ke card pembungkus
@@ -65,12 +74,23 @@ export default function RelawanPage() {
         status: "Diproses", 
         relawan_terlibat: arrayUnion(userUid) 
       });
+=======
+  const handleAmbilAlih = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Mencegah klik menembus ke card pembungkus
+    if (!userUid) return;
+    try {
+      await updateDoc(doc(db, "laporan", id), { status: "Diproses", relawan_id: userUid });
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
       setActiveTab("tugas_saya");
     } catch (error) {
       alert("Gagal mengambil alih tugas.");
     }
   };
 
+<<<<<<< HEAD
+=======
+  // ─── FIX: URL Google Maps Direction ───
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
   const bukaNavigasi = (lat: number, lng: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank");
@@ -104,6 +124,7 @@ export default function RelawanPage() {
     }
   };
 
+<<<<<<< HEAD
   // Filter pintar: Radar masuk menampilkan yang menunggu atau diproses TAPI relawan ini belum gabung
   const laporanMenunggu = laporan.filter(l => 
     l.status === "Menunggu" || 
@@ -114,6 +135,10 @@ export default function RelawanPage() {
   const tugasSaya = laporan.filter(l => 
     (l.relawan_terlibat || []).includes(userUid || "")
   );
+=======
+  const laporanMenunggu = laporan.filter(l => l.status === "Menunggu");
+  const tugasSaya = laporan.filter(l => l.status === "Diproses" && l.relawan_id === userUid);
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
 
   if (!userUid) return <div className="min-h-screen bg-slate-50 flex justify-center items-center"><Loader2 className="animate-spin text-blue-600" /></div>;
 
@@ -156,6 +181,7 @@ export default function RelawanPage() {
               <p className="text-xs text-slate-400 mt-1">Belum ada tugas.</p>
             </div>
           ) : (
+<<<<<<< HEAD
             (activeTab === "menunggu" ? laporanMenunggu : tugasSaya).map((item) => {
               // Kalkulasi Kuota Relawan
               const batas = item.kebutuhan_relawan || 5;
@@ -224,6 +250,50 @@ export default function RelawanPage() {
                 </div>
               );
             })
+=======
+            (activeTab === "menunggu" ? laporanMenunggu : tugasSaya).map((item) => (
+              <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col transition-all hover:border-indigo-300">
+
+                {/* Area Konten Utama (Bisa Diklik untuk Detail) */}
+                <div onClick={() => setDetailTask(item)} className="p-4 flex gap-4 items-start cursor-pointer group active:bg-slate-50">
+                  <div className="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-slate-100 relative shadow-sm border border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.foto_url} alt="Bencana" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-sm font-bold text-slate-800 leading-tight">{item.jenis_bencana}</h3>
+                      <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(item.waktu_kejadian).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.deskripsi}</p>
+                    <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-indigo-500">
+                      Lihat Info Lengkap &rarr;
+                    </div>
+                  </div>
+                </div>
+
+                {/* Baris Tombol Aksi */}
+                <div className="bg-slate-50 border-t border-slate-100 p-3 flex gap-2">
+                  <button onClick={(e) => bukaNavigasi(item.koordinat.lat, item.koordinat.lng, e)} className="flex-1 py-2.5 bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-sm">
+                    <Navigation className="w-4 h-4 text-blue-600" /> Google Maps
+                  </button>
+
+                  {activeTab === "menunggu" ? (
+                    <button onClick={(e) => handleAmbilAlih(item.id as string, e)} className="flex-[1.5] py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md shadow-blue-200">
+                      <Check className="w-4 h-4" /> Ambil Alih
+                    </button>
+                  ) : (
+                    <button onClick={() => setSelectedTask(item)} className="flex-[1.5] py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl flex justify-center items-center gap-2 transition-colors shadow-md shadow-emerald-200">
+                      <CheckCircle2 className="w-4 h-4" /> Selesaikan Misi
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
           )}
         </div>
       </div>
@@ -239,11 +309,16 @@ export default function RelawanPage() {
               </div>
               <button onClick={() => setDetailTask(null)} className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-500"><X className="w-4 h-4" /></button>
             </div>
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
             <div className="overflow-y-auto pb-6">
               {/* Foto Skala Penuh */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={detailTask.foto_url} alt="Bencana" className="w-full h-48 object-cover bg-slate-100" />
+<<<<<<< HEAD
               
               <div className="p-5 space-y-4">
                 <div className="flex justify-between items-start">
@@ -252,11 +327,30 @@ export default function RelawanPage() {
                     <p className="text-xl font-black text-slate-800">{detailTask.jenis_bencana}</p>
                   </div>
                   <div className="text-right">
+=======
+
+              <div className="p-5 space-y-4">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kategori Bencana</p>
+                  <p className="text-xl font-black text-slate-800">{detailTask.jenis_bencana}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Kondisi Lapangan</p>
+                  <p className="text-sm font-medium text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">{detailTask.deskripsi}</p>
+                </div>
+                <div className="flex gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Waktu Kejadian</p>
+                    <p className="text-sm font-bold text-slate-700">{new Date(detailTask.waktu_kejadian).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                  </div>
+                  <div>
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${detailTask.status === 'Menunggu' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>{detailTask.status}</span>
                   </div>
                 </div>
 
+<<<<<<< HEAD
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Identitas Pelapor</p>
                   <p className="text-sm font-bold text-slate-800">{detailTask.nama_pelapor || "Warga Anonim"}</p>
@@ -268,6 +362,8 @@ export default function RelawanPage() {
                   <p className="text-sm font-medium text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">{detailTask.deskripsi}</p>
                 </div>
                 
+=======
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
                 <button onClick={() => bukaNavigasi(detailTask.koordinat.lat, detailTask.koordinat.lng)} className="w-full mt-4 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200">
                   <Navigation className="w-5 h-5" /> Mulai Navigasi Rute Sekarang
                 </button>
@@ -277,9 +373,16 @@ export default function RelawanPage() {
         </div>
       )}
 
+<<<<<<< HEAD
       {/* ── MODAL 2: PENYELESAIAN TUGAS ── */}
       {selectedTask && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+=======
+      {/* ── MODAL 2: PENYELESAIAN TUGAS (Sama seperti sebelumnya) ── */}
+      {selectedTask && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+          {/* ... (Isi modal selesaikan tugas tidak berubah) ... */}
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
           <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center sticky top-0 z-10">
               <div><h3 className="font-bold text-slate-800">Validasi Selesai</h3><p className="text-[10px] text-slate-500">ID: {selectedTask.id}</p></div>

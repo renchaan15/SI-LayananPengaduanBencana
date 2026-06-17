@@ -38,9 +38,15 @@ function KpiCard({
 }) {
   const [display, setDisplay] = useState(0);
   const colors = {
+<<<<<<< HEAD
     slate:   { bg: "bg-white",          border: "border-slate-200",     icon: "bg-slate-100 text-slate-600",   val: "text-slate-800",      badge: "bg-slate-100 text-slate-500" },
     red:     { bg: "bg-red-50",         border: "border-red-100",       icon: "bg-red-100 text-red-600",       val: "text-red-700",        badge: "bg-red-100 text-red-600" },
     amber:   { bg: "bg-amber-50",       border: "border-amber-100",     icon: "bg-amber-100 text-amber-600",   val: "text-amber-700",      badge: "bg-amber-100 text-amber-600" },
+=======
+    slate:   { bg: "bg-white",          border: "border-slate-200",     icon: "bg-slate-100 text-slate-600",   val: "text-slate-800",       badge: "bg-slate-100 text-slate-500" },
+    red:     { bg: "bg-red-50",         border: "border-red-100",       icon: "bg-red-100 text-red-600",       val: "text-red-700",         badge: "bg-red-100 text-red-600" },
+    amber:   { bg: "bg-amber-50",       border: "border-amber-100",     icon: "bg-amber-100 text-amber-600",   val: "text-amber-700",       badge: "bg-amber-100 text-amber-600" },
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
     emerald: { bg: "bg-emerald-50",     border: "border-emerald-100",   icon: "bg-emerald-100 text-emerald-600",val: "text-emerald-700",   badge: "bg-emerald-100 text-emerald-600" },
   };
   const c = colors[color];
@@ -83,13 +89,19 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     Menunggu:  "bg-red-50 text-red-600 border-red-200",
     Ditangani: "bg-amber-50 text-amber-600 border-amber-200",
+<<<<<<< HEAD
     Diproses:  "bg-amber-50 text-amber-600 border-amber-200",
+=======
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
     Selesai:   "bg-emerald-50 text-emerald-600 border-emerald-200",
   };
   const dots: Record<string, string> = {
     Menunggu: "bg-red-500 animate-pulse",
     Ditangani: "bg-amber-500",
+<<<<<<< HEAD
     Diproses:  "bg-amber-500",
+=======
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
     Selesai: "bg-emerald-500",
   };
   return (
@@ -162,15 +174,22 @@ export default function AdminDashboard() {
     router.replace("/login");
   };
 
+<<<<<<< HEAD
   // ── FIX: TypeScript Error Handling ──
   // Menambahkan casting (as string) agar TypeScript tidak protes pada properti status
   const statMenunggu  = laporan.filter(l => l.status === "Menunggu").length;
   const statDitangani = laporan.filter(l => l.status === "Diproses" || (l.status as string) === "Ditangani").length;
+=======
+  // ── Statistik ──
+  const statMenunggu  = laporan.filter(l => l.status === "Menunggu").length;
+  const statDitangani = laporan.filter(l => l.status === "Diproses").length;
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
   const statSelesai   = laporan.filter(l => l.status === "Selesai").length;
 
   // ── Filter & Search ──
   const filteredLaporan = laporan.filter(l => {
     const matchSearch = l.jenis_bencana.toLowerCase().includes(searchQuery.toLowerCase()) 
+<<<<<<< HEAD
                       || (l.id?.toLowerCase() ?? "").includes(searchQuery.toLowerCase());
     
     // FIX: Mendeklarasikan checkStatus sebagai tipe string umum
@@ -178,6 +197,10 @@ export default function AdminDashboard() {
     if (checkStatus === "Diproses") checkStatus = "Ditangani";
 
     const matchStatus = filterStatus === "Semua" || checkStatus === filterStatus;
+=======
+                     || (l.id?.toLowerCase() ?? "").includes(searchQuery.toLowerCase());
+    const matchStatus = filterStatus === "Semua" || l.status === filterStatus;
+>>>>>>> 69617d2e67bb988dafe96d979059a5b1d7ff53d8
     return matchSearch && matchStatus;
   });
 
